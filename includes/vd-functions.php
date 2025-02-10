@@ -381,6 +381,11 @@ function vd_register_settings() {
     register_setting('vd_settings_group', 'vd_delete_data_on_uninstall');
     add_settings_section('vd_general_settings_section', '', '', 'vd_settings');
     add_settings_field('vd_delete_data_field', 'Eliminar datos al desinstalar', 'vd_delete_data_field_render', 'vd_settings', 'vd_general_settings_section');
+    add_settings_section('vd_updates_section', 'Actualizaciones', 'vd_updates_section_cb', 'vd_settings');
+    add_settings_field('vd_current_version', 'Versión actual', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
+    add_settings_field('vd_last_check', 'Última comprobación', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
+    add_settings_field('vd_update_available', 'Actualización disponible', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
+    add_settings_field('vd_check_updates', 'Comprobar actualizaciones', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
 }
 
 
@@ -390,7 +395,75 @@ function vd_delete_data_field_render() {
     echo '<input type="checkbox" name="vd_delete_data_on_uninstall" value="1" ' . checked(1, $option, false) . '>';
 }
 
+function vd_text_field_cb($args) {
+    $option = get_option($args['id']);
+    echo '<input type="text" name="' . $args['id'] . '" value="' . $option . '">';
+}
+
+function vd_updates_section_cb($args) {
+    // Obtener la información del plugin actual
+    if (!function_exists('get_plugin_data')) {
+        require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+    }
+    $plugin_data = get_plugin_data(WP_PLUGIN_DIR . '/variables-dinamicas/variables-dinamicas.php');
+    $current_version = $plugin_data['Version'];
+    
+    // Obtener la última comprobación
+    $last_check = get_transient('vd_update_check');
+    $last_check_date = $last_check ? date('Y-m-d H:i:s', $last_check) : 'Nunca';
+    
+    // Obtener información de actualización
+    $update_info = get_transient('vd_update_info');
+    $update_available = false;
+    $new_version = '';
+    
+    if ($update_info && isset($update_info['version'])) {
+        $update_available = version_compare($update_info['version'], $current_version, '>');
+        $new_version = $update_info['version'];
+    }
+    
+    echo '<div class="vd-updates-info">';
+    echo '<p><strong>Versión actual:</strong> ' . esc_html($current_version) . '</p>';
+    echo '<p><strong>Última comprobación:</strong> ' . esc_html($last_check_date) . '</p>';
+    
+    if ($update_available) {
+        echo '<div class="notice notice-warning inline"><p><strong>¡Hay una nueva versión disponible!</strong> ' .
+             'Versión ' . esc_html($new_version) . ' lista para instalar.</p></div>';
+    }
+    
+    echo '<form method="post" action="">';
+    wp_nonce_field('vd_check_updates', 'vd_check_updates_nonce');
+    submit_button('Comprobar actualizaciones', 'secondary', 'vd_check_updates', false);
+    echo '</form>';
+    echo '</div>';
+}
+
+function vd_handle_manual_update_check() {
+    if (!isset($_POST['vd_check_updates'])) {
+        return;
+    }
+    
+    // Verificar nonce y permisos
+    if (!isset($_POST['vd_check_updates_nonce']) || 
+        !wp_verify_nonce($_POST['vd_check_updates_nonce'], 'vd_check_updates') ||
+        !current_user_can('manage_options')) {
+        wp_die(__('No tienes permisos para realizar esta acción.'));
+    }
+    
+    // Forzar comprobación eliminando las transients
+    delete_transient('vd_update_check');
+    delete_transient('vd_update_info');
+    
+    // Ejecutar comprobación
+    vd_plugin_updater();
+    
+    // Redirigir de vuelta a la página de configuración
+    wp_redirect(add_query_arg('settings-updated', 'true', wp_get_referer()));
+    exit;
+}
+
 add_action('admin_init', 'vd_register_settings');
+add_action('admin_init', 'vd_handle_manual_update_check');
 
 function vd_init_shortcodes() {
     add_shortcode('vd_variable', 'vd_variable_shortcode');
@@ -611,7 +684,7 @@ function agregarCondicion(index) {
 }
 
 add_filter('nonce_life', function () {
-    return 12 * HOUR_IN_SECONDS; // 12 horas
+    return 1 * HOUR_IN_SECONDS; // 1 hora
 });
 
 function vd_enqueue_admin_styles($hook_suffix) {
@@ -682,8 +755,8 @@ function vd_plugin_updater() {
             error_log('VD Plugin: URL de descarga: ' . $update_data['download_url']);
             
             // Guardar la información de actualización
-            set_transient('vd_update_info', $update_data, 12 * HOUR_IN_SECONDS);
-            set_transient('vd_update_check', time(), 12 * HOUR_IN_SECONDS);
+            set_transient('vd_update_info', $update_data, 1 * HOUR_IN_SECONDS);
+            set_transient('vd_update_check', time(), 1 * HOUR_IN_SECONDS);
             
         } catch (Exception $e) {
             error_log('Error en vd_plugin_updater: ' . $e->getMessage());
