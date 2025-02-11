@@ -191,7 +191,7 @@ function agregarValorCondicion() {
         </div>
         <div class="condiciones-container w-full p-2" id="condiciones-container-${valorIndex}"></div>
         <div class="w-full my-2 justify-end">
-            <button type="button" class="bg-red-500 hover:bg-red-700 text-white hover:text-white font-bold py-2 px-4 h-10 rounded pull-right" onclick="this.parentElement.parentElement.remove();">Eliminar Valor Condicional</button>
+            <button type="button" class="bg-red-500 hover:bg-red-700 text-white hover:text-white font-bold py-2 px-4 rounded pull-right w-1/3" onclick="this.parentElement.parentElement.remove();">Eliminar Valor</button>
         </div>
         </div>
     `;
@@ -886,14 +886,45 @@ function vd_plugin_updater() {
             error_log('VD Plugin: URL de descarga: ' . $update_data['download_url']);
             
             // Guardar la información de actualización
-            set_transient('vd_update_info', $update_data, 1 * HOUR_IN_SECONDS);
-            set_transient('vd_update_check', time(), 1 * HOUR_IN_SECONDS);
+            set_transient('vd_update_info', $update_data, 12 * HOUR_IN_SECONDS);
+            set_transient('vd_update_check', time(), 12 * HOUR_IN_SECONDS);
+
+            // Si hay una nueva versión, actualizar el transient de WordPress
+            if (isset($update_data['version']) && version_compare($update_data['version'], $current_version, '>')) {
+                $plugin_slug = plugin_basename(WP_PLUGIN_DIR . '/variables-dinamicas/variables-dinamicas.php');
+                
+                // Crear objeto de actualización
+                $update_object = new stdClass();
+                $update_object->slug = 'variables-dinamicas';
+                $update_object->plugin = $plugin_slug;
+                $update_object->new_version = $update_data['version'];
+                $update_object->url = isset($update_data['details_url']) ? $update_data['details_url'] : '';
+                $update_object->package = isset($update_data['download_url']) ? $update_data['download_url'] : '';
+                
+                // Obtener el transient actual de actualizaciones
+                $current_updates = get_site_transient('update_plugins');
+                if (!is_object($current_updates)) {
+                    $current_updates = new stdClass();
+                }
+                
+                if (!isset($current_updates->response)) {
+                    $current_updates->response = array();
+                }
+                
+                // Añadir/actualizar nuestro plugin en la lista de actualizaciones
+                $current_updates->response[$plugin_slug] = $update_object;
+                
+                // Guardar el transient actualizado
+                set_site_transient('update_plugins', $current_updates);
+            }
             
+            return $update_data;
         } catch (Exception $e) {
             error_log('Error en vd_plugin_updater: ' . $e->getMessage());
-            return;
         }
     }
+    
+    return false;
 }
 
 /**
