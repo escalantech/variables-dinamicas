@@ -1,9 +1,9 @@
 {
-    "version": "1.1.2",
-    "download_url": "https://web-eeci.ltwdesarrollo.es/plugin-updates/v1.1.1/variables-dinamicas.zip",
+    "version": "1.1.5",
+    "download_url": "https://github.com/escalantech/variables-dinamicas/releases/download/v1.1.5/variables-dinamicas.zip",
     "requires": "5.0",
     "tested": "6.7.1",
-    "last_updated": "2025-02-10 13:00:00",
+    "last_updated": "2025-02-11 14:00:00",
     "description": "Plugin para configurar y mostrar variables dinámicas basadas en parámetros de URL.",
-    "changelog": "<h4>1.1.2</h4><ul><li>Función para mostrar campos dinámicos y actualizaciones remotas</li></ul>"
+    "changelog": "<h4>1.1.5</h4><ul><li>Cambios en páginas del panel de admin para guardar la configuración</li></ul>"
 }
