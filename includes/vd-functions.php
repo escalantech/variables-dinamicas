@@ -82,17 +82,16 @@ register_uninstall_hook(__FILE__, 'vd_uninstall');
 
 
 function vd_admin_menus() {
-    // Página principal del plugin
-    add_menu_page('Gestión de Variables Dinámicas', 'Variables Dinámicas', 'manage_options', 'vd_main', 'vd_manage_variables', 'dashicons-shortcode');
-
-    // Crear nueva variable
+    add_menu_page('Variables Dinámicas', 'Variables Dinámicas', 'manage_options', 'vd_main', 'vd_manage_variables', 'dashicons-randomize');
+    
+    // Submenús
+    add_submenu_page('vd_main', 'Variables Dinámicas', 'Variables', 'manage_options', 'vd_main');
     add_submenu_page('vd_main', 'Añadir Nueva Variable', 'Añadir Nueva Variable', 'manage_options', 'vd_add_variable', 'vd_add_variable_page');
-
-    // Asegúrate de no mostrar en el menú si no deseas un acceso directo desde el menú lateral
     add_submenu_page('vd_hidden_parent_page', 'Editar Variable', '', 'manage_options', 'vd_edit_variable', 'vd_edit_variable_page');
-
-    // Submenú para configuraciones generales
-    add_submenu_page('vd_main', 'Configuración General', 'Configuración General', 'manage_options', 'vd_settings', 'vd_general_settings');
+    
+    // Separar las páginas de configuración
+    add_submenu_page('vd_main', 'Configuración General', 'Configuración General', 'manage_options', 'vd_settings', 'vd_settings_page');
+    add_submenu_page('vd_main', 'Actualizaciones', 'Actualizaciones', 'manage_options', 'vd_updates', 'vd_updates_page');
 }
 
 add_action('admin_menu', 'vd_admin_menus');
@@ -115,7 +114,7 @@ function vd_manage_variables() {
             <?php vd_display_variables_table(); ?>
             <!-- Botón para eliminar variables seleccionadas -->
             <br>
-            <input type="submit" name="delete_selected" class="action bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded cursor-pointer" value="Eliminar Seleccionadas">
+            <input type="submit" name="delete_selected" class="action bg-red-500 hover:bg-red-800 text-white font-bold py-2 px-4 rounded cursor-pointer mx-auto w-full md:w-1/3 h-12" value="Eliminar Seleccionadas">
         </form>
     </div>
     <?php
@@ -356,48 +355,38 @@ function vd_delete_selected_variables() {
 }
 
 
-function vd_general_settings() {
-    // Aquí iría el formulario de configuraciones generales, incluyendo la opción de borrado al desactivar
+function vd_options_page() {
+    if (!current_user_can('manage_options')) {
+        wp_die(__('No tienes permisos suficientes para acceder a esta página.'));
+    }
     ?>
-    <div class="container mx-auto my-4 border-solid border-gray-400 rounded border shadow-sm w-full">
-        <div class='px-3 py-8 bg-gray-300 border-solid border-gray-400 border-b'>
-            <h1 class='text-3xl'>Configuración General</h1>
-        </div> 
-        <form class="w-full px-3 py-6" method="post" action="options.php">
-        <?php settings_fields('vd_settings_group'); ?>
-        <div class='m-2 mt-12'>
-            <?php do_settings_sections('vd_settings'); ?>
-        </div>
-        <div class='m-2 mt-12 text-center'>
-            <input type='submit' name='submit' id='submit' class='bg-blue-500 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded cursor-pointer mx-auto w-full md:w-1/3 h-12' value='Guardar configuración'>
-        </div>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        
+        <?php
+        // Mostrar mensajes de éxito/error
+        if (isset($_GET['settings-updated']) && $_GET['settings-updated'] == 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>Configuración guardada.</p></div>';
+        }
+        if (isset($_GET['update-check']) && $_GET['update-check'] == 'completed') {
+            echo '<div class="notice notice-info is-dismissible"><p>Comprobación de actualizaciones completada.</p></div>';
+        }
+        ?>
+
+        <form method="post" action="options.php">
+            <?php
+            // Campos ocultos necesarios para WordPress
+            settings_fields('vd_settings_group');
+            
+            // Secciones de configuración
+            do_settings_sections('vd_settings');
+            
+            // Botón de guardar
+            submit_button('Guardar configuración');
+            ?>
         </form>
     </div>  
     <?php
-}
-
-
-function vd_register_settings() {
-    register_setting('vd_settings_group', 'vd_delete_data_on_uninstall');
-    add_settings_section('vd_general_settings_section', '', '', 'vd_settings');
-    add_settings_field('vd_delete_data_field', 'Eliminar datos al desinstalar', 'vd_delete_data_field_render', 'vd_settings', 'vd_general_settings_section');
-    add_settings_section('vd_updates_section', 'Actualizaciones', 'vd_updates_section_cb', 'vd_settings');
-    add_settings_field('vd_current_version', 'Versión actual', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
-    add_settings_field('vd_last_check', 'Última comprobación', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
-    add_settings_field('vd_update_available', 'Actualización disponible', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
-    add_settings_field('vd_check_updates', 'Comprobar actualizaciones', 'vd_text_field_cb', 'vd_settings', 'vd_updates_section');
-}
-
-
-
-function vd_delete_data_field_render() {
-    $option = get_option('vd_delete_data_on_uninstall');
-    echo '<input type="checkbox" name="vd_delete_data_on_uninstall" value="1" ' . checked(1, $option, false) . '>';
-}
-
-function vd_text_field_cb($args) {
-    $option = get_option($args['id']);
-    echo '<input type="text" name="' . $args['id'] . '" value="' . $option . '">';
 }
 
 function vd_updates_section_cb($args) {
@@ -408,9 +397,20 @@ function vd_updates_section_cb($args) {
     $plugin_data = get_plugin_data(WP_PLUGIN_DIR . '/variables-dinamicas/variables-dinamicas.php');
     $current_version = $plugin_data['Version'];
     
-    // Obtener la última comprobación
+    // Obtener la última comprobación y convertir a la zona horaria de WordPress
     $last_check = get_transient('vd_update_check');
-    $last_check_date = $last_check ? date('Y-m-d H:i:s', $last_check) : 'Nunca';
+    if ($last_check) {
+        // Obtener la zona horaria de WordPress
+        $wp_timezone = wp_timezone();
+        
+        // Crear objeto DateTime con la marca de tiempo UTC
+        $date_utc = new DateTime('@' . $last_check);
+        $date_utc->setTimezone($wp_timezone);
+        
+        $last_check_date = $date_utc->format('Y-m-d H:i:s');
+    } else {
+        $last_check_date = 'Nunca';
+    }
     
     // Obtener información de actualización
     $update_info = get_transient('vd_update_info');
@@ -422,19 +422,26 @@ function vd_updates_section_cb($args) {
         $new_version = $update_info['version'];
     }
     
+    // Mostrar la información de actualización
     echo '<div class="vd-updates-info">';
     echo '<p><strong>Versión actual:</strong> ' . esc_html($current_version) . '</p>';
     echo '<p><strong>Última comprobación:</strong> ' . esc_html($last_check_date) . '</p>';
+    echo '<br><br>';
     
     if ($update_available) {
-        echo '<div class="notice notice-warning inline"><p><strong>¡Hay una nueva versión disponible!</strong> ' .
-             'Versión ' . esc_html($new_version) . ' lista para instalar.</p></div>';
+        echo '<div class="notice notice-warning" style="margin: 0;padding: 12px;"><strong>¡Hay una nueva versión disponible!</strong> ' . 'Versión ' . esc_html($new_version) . ' lista para instalar.</div>';
+        echo '<br><br>';
     }
     
-    echo '<form method="post" action="">';
-    wp_nonce_field('vd_check_updates', 'vd_check_updates_nonce');
-    submit_button('Comprobar actualizaciones', 'secondary', 'vd_check_updates', false);
-    echo '</form>';
+    // Formulario separado para el botón de comprobación de actualizaciones
+    ?>
+    <div style="margin-top: 15px;">
+        <form method="post" action="">
+            <?php wp_nonce_field('vd_check_updates', 'vd_check_updates_nonce'); ?>
+            <input type="submit" name="vd_check_updates" class="button button-secondary" value="Comprobar actualizaciones">
+        </form>
+    </div>
+    <?php
     echo '</div>';
 }
 
@@ -457,13 +464,137 @@ function vd_handle_manual_update_check() {
     // Ejecutar comprobación
     vd_plugin_updater();
     
-    // Redirigir de vuelta a la página de configuración
-    wp_redirect(add_query_arg('settings-updated', 'true', wp_get_referer()));
+    // Redirigir de vuelta a la página de actualizaciones
+    wp_safe_redirect(add_query_arg('update-check', 'completed', admin_url('admin.php?page=vd_updates')));
     exit;
 }
 
 add_action('admin_init', 'vd_register_settings');
 add_action('admin_init', 'vd_handle_manual_update_check');
+
+function vd_settings_page() {
+    if (!current_user_can('manage_options')) {
+        wp_die(__('No tienes permisos suficientes para acceder a esta página.'));
+    }
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        
+        <?php
+        if (isset($_GET['settings-updated']) && $_GET['settings-updated'] == 'true') {
+            echo '<div class="notice notice-success is-dismissible"><p>Configuración guardada.</p></div>';
+        }
+        ?>
+
+        <form method="post" action="options.php">
+            <?php
+            settings_fields('vd_settings_group');
+            do_settings_sections('vd_settings');
+            submit_button('Guardar configuración');
+            ?>
+        </form>
+    </div>
+    <?php
+}
+
+function vd_updates_page() {
+    if (!current_user_can('manage_options')) {
+        wp_die(__('No tienes permisos suficientes para acceder a esta página.'));
+    }
+    ?>
+    <div class="wrap">
+        <h1><?php echo esc_html(get_admin_page_title()); ?></h1>
+        
+        <?php
+        if (isset($_GET['update-check']) && $_GET['update-check'] == 'completed') {
+            echo '<div class="notice notice-info is-dismissible"><p>Comprobación de actualizaciones completada.</p></div>';
+        }
+        
+        // Obtener la información del plugin actual
+        if (!function_exists('get_plugin_data')) {
+            require_once(ABSPATH . 'wp-admin/includes/plugin.php');
+        }
+        $plugin_data = get_plugin_data(WP_PLUGIN_DIR . '/variables-dinamicas/variables-dinamicas.php');
+        $current_version = $plugin_data['Version'];
+        
+        // Obtener la última comprobación y convertir a la zona horaria de WordPress
+        $last_check = get_transient('vd_update_check');
+        if ($last_check) {
+            $wp_timezone = wp_timezone();
+            $date_utc = new DateTime('@' . $last_check);
+            $date_utc->setTimezone($wp_timezone);
+            $last_check_date = $date_utc->format('Y-m-d H:i:s');
+        } else {
+            $last_check_date = 'Nunca';
+        }
+        
+        // Obtener información de actualización
+        $update_info = get_transient('vd_update_info');
+        $update_available = false;
+        $new_version = '';
+        
+        if ($update_info && isset($update_info['version'])) {
+            $update_available = version_compare($update_info['version'], $current_version, '>');
+            $new_version = $update_info['version'];
+        }
+        ?>
+        
+        <div class="vd-updates-info">
+            <p><strong>Versión actual:</strong> <?php echo esc_html($current_version); ?></p>
+            <p><strong>Última comprobación:</strong> <?php echo esc_html($last_check_date); ?></p>
+            <br><br>
+            
+            <?php if ($update_available): ?>
+                <div class="notice notice-warning" style="margin: 0;padding: 12px;">
+                    <strong>¡Hay una nueva versión disponible!</strong> 
+                    Versión <?php echo esc_html($new_version); ?> lista para instalar.
+                </div>
+                <br><br>
+            <?php endif; ?>
+            
+            <form method="post" action="">
+                <?php wp_nonce_field('vd_check_updates', 'vd_check_updates_nonce'); ?>
+                <input type="submit" name="vd_check_updates" class="button button-secondary" value="Comprobar actualizaciones">
+            </form>
+        </div>
+    </div>
+    <?php
+}
+
+function vd_register_settings() {
+    // Registrar la opción
+    register_setting('vd_settings_group', 'vd_delete_data_on_uninstall');
+    
+    // Sección general
+    add_settings_section(
+        'vd_general_settings_section',
+        '',
+        '',
+        'vd_settings'
+    );
+    
+    // Campo de eliminar datos
+    add_settings_field(
+        'vd_delete_data_field',
+        'Eliminar datos al desinstalar',
+        'vd_delete_data_field_render',
+        'vd_settings',
+        'vd_general_settings_section'
+    );
+}
+
+function vd_delete_data_field_render() {
+    $option = get_option('vd_delete_data_on_uninstall');
+    ?>
+    <label>
+        <input type="checkbox" 
+               name="vd_delete_data_on_uninstall" 
+               value="1" 
+               <?php checked($option, '1'); ?>>
+        Eliminar todas las variables y configuraciones al desinstalar el plugin
+    </label>
+    <?php
+}
 
 function vd_init_shortcodes() {
     add_shortcode('vd_variable', 'vd_variable_shortcode');
@@ -565,7 +696,7 @@ function vd_edit_variable_page() {
 
     $data = json_decode($variable->condiciones, true);
     $valorPorDefecto = $variable->valor;
-    $valoresCondicionales = $data;
+    $valoresCondicionales = $data ?? [];
     $lastindex = 0;
 
     ?>
