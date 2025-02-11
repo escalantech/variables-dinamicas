@@ -3,7 +3,7 @@
  * Plugin Name: Variables Dinámicas
  * Plugin URI: https://ofertas.energiaelcorteingles.es
  * Description: Plugin para configurar y mostrar variables dinámicas basadas en parámetros de URL.
- * Version: 1.1.4
+ * Version: 1.1.5
  * Author: Chris Escalante
  * Author URI: https://ofertas.energiaelcorteingles.es
  */
